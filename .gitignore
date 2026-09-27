@@ -11,3 +11,5 @@ target/
 *.log
 *.tsbuildinfo
 programs/**/target/
+.vercel
+.env*
