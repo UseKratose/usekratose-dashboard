@@ -23,6 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -38,6 +39,24 @@ import type {
 } from "@/lib/types";
 
 import { StatusBadge } from "./status-badge";
+
+const EvidenceCoverageChart = dynamic(
+  () =>
+    import("./evidence-coverage-chart").then(
+      (module) => module.EvidenceCoverageChart,
+    ),
+  {
+    loading: () => (
+      <section
+        aria-label="Loading evidence coverage chart"
+        className="inspection-section evidence-chart-loading"
+      >
+        <i />
+      </section>
+    ),
+    ssr: false,
+  },
+);
 
 function snapshotValue(
   snapshot: Readonly<Record<string, unknown>> | null,
@@ -1359,6 +1378,8 @@ export function ProgramInspector({
                       <small>{entry.program.programDataAddress}</small>
                     </article>
                   </section>
+
+                  <EvidenceCoverageChart current={current} />
 
                   <section className="inspection-section">
                     <div className="inspection-section-heading">
