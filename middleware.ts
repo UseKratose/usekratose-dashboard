@@ -5,6 +5,7 @@ import { DASHBOARD_BASE_PATH, dashboardPath } from "@/lib/paths";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  if (request.nextUrl.pathname.endsWith("/session-probe")) return response;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !publishableKey) return response;
