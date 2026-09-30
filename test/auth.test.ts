@@ -26,7 +26,7 @@ describe("dashboard authentication", () => {
 
   it("returns confirmations to the single-origin dashboard", () => {
     expect(signupConfirmationUrl("https://usekratose.vercel.app")).toBe(
-      "https://usekratose.vercel.app/auth/callback?redirect=%2Fdashboard%2Foverview",
+      "https://usekratose.vercel.app/auth/callback?redirect=%2Fdashboard",
     );
   });
 });

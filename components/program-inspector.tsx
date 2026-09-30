@@ -31,6 +31,7 @@ import { dashboardPath } from "@/lib/paths";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type {
   DashboardFixReview,
+  DashboardGitHubConnection,
   DashboardProgram,
   DashboardProgramAnalysis,
   DashboardSourceWorkspace,
@@ -324,6 +325,9 @@ export function ProgramInspector({
   const [source, setSource] = useState<DashboardSourceWorkspace | null>(null);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [sourcePending, setSourcePending] = useState(false);
+  const [githubConnection, setGitHubConnection] =
+    useState<DashboardGitHubConnection | null>(null);
+  const [selectedRepositoryUrl, setSelectedRepositoryUrl] = useState("");
   const [selectedSourcePath, setSelectedSourcePath] = useState<string | null>(
     null,
   );
@@ -389,19 +393,34 @@ export function ProgramInspector({
     setSourcePending(true);
     setSourceError(null);
     try {
-      const response = await fetch(
-        dashboardPath(`/api/programs/${entry.program.id}/source`),
-      );
-      const body = (await response.json().catch(() => null)) as {
+      const [sourceResponse, githubResponse] = await Promise.all([
+        fetch(dashboardPath(`/api/programs/${entry.program.id}/source`)),
+        fetch(
+          dashboardPath(
+            `/api/programs/${entry.program.id}/github/repositories`,
+          ),
+        ),
+      ]);
+      const body = (await sourceResponse.json().catch(() => null)) as {
         readonly data?: DashboardSourceWorkspace | null;
         readonly error?: { readonly message?: string };
       } | null;
-      if (!response.ok) {
+      if (!sourceResponse.ok) {
         throw new Error(body?.error?.message ?? "Failed to load source");
       }
       const workspace = body?.data ?? null;
       setSource(workspace);
       setSelectedSourcePath(workspace?.sourceFiles[0]?.path ?? null);
+      const githubBody = (await githubResponse.json().catch(() => null)) as {
+        readonly data?: DashboardGitHubConnection;
+        readonly error?: { readonly message?: string };
+      } | null;
+      if (githubResponse.ok && githubBody?.data !== undefined) {
+        setGitHubConnection(githubBody.data);
+        const selected =
+          workspace?.repositoryUrl ?? githubBody.data.repositories[0]?.url ?? "";
+        setSelectedRepositoryUrl(selected);
+      }
     } catch (error) {
       setSourceError(
         error instanceof Error ? error.message : "Failed to load source",
@@ -422,10 +441,46 @@ export function ProgramInspector({
         {
           body: JSON.stringify({
             action: "connect-github",
-            installationId:
-              String(form.get("installationId") ?? "").trim() || null,
             repositoryUrl: form.get("repositoryUrl"),
             revision: String(form.get("revision") ?? "").trim() || undefined,
+          }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        readonly data?: DashboardSourceWorkspace;
+        readonly error?: { readonly message?: string };
+      } | null;
+      if (!response.ok || body?.data === undefined) {
+        throw new Error(body?.error?.message ?? "GitHub connection failed");
+      }
+      setSource(body.data);
+      setSelectedSourcePath(body.data.sourceFiles[0]?.path ?? null);
+    } catch (error) {
+      setSourceError(
+        error instanceof Error ? error.message : "GitHub connection failed",
+      );
+    } finally {
+      setSourcePending(false);
+    }
+  }
+
+  async function connectSelectedRepository() {
+    if (selectedRepositoryUrl === "") return;
+    const repository = githubConnection?.repositories.find(
+      (candidate) => candidate.url === selectedRepositoryUrl,
+    );
+    setSourcePending(true);
+    setSourceError(null);
+    try {
+      const response = await fetch(
+        dashboardPath(`/api/programs/${entry.program.id}/source`),
+        {
+          body: JSON.stringify({
+            action: "connect-github",
+            repositoryUrl: selectedRepositoryUrl,
+            revision: repository?.defaultBranch,
           }),
           headers: { "content-type": "application/json" },
           method: "POST",
@@ -454,7 +509,7 @@ export function ProgramInspector({
     setSourceError(null);
     try {
       const response = await fetch(
-        `/api/programs/${entry.program.id}/github/install`,
+        dashboardPath(`/api/programs/${entry.program.id}/github/install`),
       );
       const body = (await response.json().catch(() => null)) as {
         readonly data?: { readonly url: string };
@@ -933,33 +988,164 @@ export function ProgramInspector({
                   </section>
                 ) : (
                   <div className="source-workspace">
-                    <section className="source-connect-grid">
-                      <form
-                        className="inspection-section source-connect-card"
-                        onSubmit={connectGitHub}
-                      >
-                        <div className="inspection-section-heading">
-                          <div>
-                            <h3>
-                              <Github size={16} /> Connect GitHub
-                            </h3>
-                            <p>
-                              Public repositories work immediately. Private
-                              repositories require a GitHub App installation.
-                            </p>
-                          </div>
+                    <section className="inspection-section source-connect-card source-upload-card">
+                      <div className="inspection-section-heading">
+                        <div>
+                          <h3>
+                            <Upload size={16} /> Upload evidence
+                          </h3>
+                          <p>
+                            Source is editable. IDLs describe interfaces. `.so`
+                            files are used only for deployment verification.
+                          </p>
                         </div>
-                        <label>
-                          Repository URL
+                      </div>
+                      <div className="artifact-upload-grid">
+                        <label className="artifact-upload">
+                          <Braces size={18} />
+                          <b>Source files</b>
+                          <span>Rust, Cargo, and Anchor files</span>
                           <input
-                            defaultValue={source?.repositoryUrl ?? ""}
-                            name="repositoryUrl"
-                            placeholder="https://github.com/org/repository"
-                            required
-                            type="url"
+                            accept=".rs,.toml,.lock,text/plain,text/x-rust"
+                            multiple
+                            onChange={(event) =>
+                              void uploadArtifacts("source", event.target.files)
+                            }
+                            type="file"
                           />
                         </label>
-                        <div className="source-form-row">
+                        <label className="artifact-upload">
+                          <FileCode2 size={18} />
+                          <b>Anchor IDL</b>
+                          <span>Normalized and hashed JSON</span>
+                          <input
+                            accept=".json,application/json"
+                            onChange={(event) =>
+                              void uploadArtifacts("idl", event.target.files)
+                            }
+                            type="file"
+                          />
+                        </label>
+                        <label className="artifact-upload">
+                          <Fingerprint size={18} />
+                          <b>Build artifact</b>
+                          <span>`.so` fingerprint verification</span>
+                          <input
+                            accept=".so,application/octet-stream"
+                            onChange={(event) =>
+                              void uploadArtifacts("binary", event.target.files)
+                            }
+                            type="file"
+                          />
+                        </label>
+                      </div>
+                    </section>
+
+                    <section className="inspection-section source-connect-card source-github-card">
+                      <div className="inspection-section-heading">
+                        <div>
+                          <h3>
+                            <Github size={16} /> Connect GitHub
+                          </h3>
+                          <p>
+                            Select an authorized repository or use the manual
+                            public-repository fallback.
+                          </p>
+                        </div>
+                        <StatusBadge
+                          tone={
+                            githubConnection?.installationConnected
+                              ? "good"
+                              : "neutral"
+                          }
+                        >
+                          {githubConnection?.installationConnected
+                            ? "Repositories authorized"
+                            : githubConnection?.githubIdentityConnected
+                              ? "GitHub signed in"
+                              : "Not connected"}
+                        </StatusBadge>
+                      </div>
+
+                      {githubConnection?.installationConnected &&
+                      githubConnection.repositories.length > 0 ? (
+                        <div className="github-repository-picker">
+                          <label>
+                            Choose a repository
+                            <select
+                              onChange={(event) =>
+                                setSelectedRepositoryUrl(event.target.value)
+                              }
+                              value={selectedRepositoryUrl}
+                            >
+                              {githubConnection.repositories.map(
+                                (repository) => (
+                                  <option
+                                    key={repository.url}
+                                    value={repository.url}
+                                  >
+                                    {repository.owner}/{repository.name}
+                                    {repository.private
+                                      ? " · Private"
+                                      : " · Public"}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                          <button
+                            className="primary-button"
+                            disabled={selectedRepositoryUrl === ""}
+                            onClick={() => void connectSelectedRepository()}
+                            type="button"
+                          >
+                            <Github size={15} />
+                            Connect selected repository
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="github-authorization-callout">
+                          <div>
+                            <b>
+                              {githubConnection?.installationConnected
+                                ? "Choose repositories for UseKratose"
+                                : githubConnection?.githubIdentityConnected
+                                  ? "Your GitHub identity is linked"
+                                  : "Authorize repository access"}
+                            </b>
+                            <p>
+                              UseKratose uses a GitHub App so you choose exactly
+                              which repositories it can read and patch.
+                            </p>
+                          </div>
+                          <button
+                            className="primary-button"
+                            onClick={() => void installGitHubApp()}
+                            type="button"
+                          >
+                            <Github size={15} />
+                            Choose GitHub repositories
+                          </button>
+                        </div>
+                      )}
+
+                      <details className="manual-repository-fallback">
+                        <summary>Connect a public repository manually</summary>
+                        <form onSubmit={connectGitHub}>
+                          <div className="manual-repository-intro">
+                            Use this when a public repository was shared with you
+                            but is not part of your authorized GitHub account.
+                          </div>
+                          <label>
+                            Repository URL
+                            <input
+                              defaultValue={source?.repositoryUrl ?? ""}
+                              name="repositoryUrl"
+                              placeholder="https://github.com/org/repository"
+                              required
+                              type="url"
+                            />
+                          </label>
                           <label>
                             Branch or commit
                             <input
@@ -968,89 +1154,12 @@ export function ProgramInspector({
                               placeholder="main"
                             />
                           </label>
-                          <label>
-                            Installation ID
-                            <input
-                              defaultValue={source?.githubInstallationId ?? ""}
-                              inputMode="numeric"
-                              name="installationId"
-                              placeholder="Private repositories only"
-                            />
-                          </label>
-                        </div>
-                        <button className="primary-button" type="submit">
-                          <Github size={15} />
-                          Connect repository
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => void installGitHubApp()}
-                          type="button"
-                        >
-                          <Github size={15} />
-                          Install for private repositories
-                        </button>
-                      </form>
-
-                      <section className="inspection-section source-connect-card">
-                        <div className="inspection-section-heading">
-                          <div>
-                            <h3>
-                              <Upload size={16} /> Upload evidence
-                            </h3>
-                            <p>
-                              Source is editable. IDLs describe interfaces.
-                              `.so` files are used only for deployment
-                              verification.
-                            </p>
-                          </div>
-                        </div>
-                        <div className="artifact-upload-grid">
-                          <label className="artifact-upload">
-                            <Braces size={18} />
-                            <b>Source files</b>
-                            <span>Rust, Cargo, and Anchor files</span>
-                            <input
-                              accept=".rs,.toml,.lock,text/plain,text/x-rust"
-                              multiple
-                              onChange={(event) =>
-                                void uploadArtifacts(
-                                  "source",
-                                  event.target.files,
-                                )
-                              }
-                              type="file"
-                            />
-                          </label>
-                          <label className="artifact-upload">
-                            <FileCode2 size={18} />
-                            <b>Anchor IDL</b>
-                            <span>Normalized and hashed JSON</span>
-                            <input
-                              accept=".json,application/json"
-                              onChange={(event) =>
-                                void uploadArtifacts("idl", event.target.files)
-                              }
-                              type="file"
-                            />
-                          </label>
-                          <label className="artifact-upload">
-                            <Fingerprint size={18} />
-                            <b>Build artifact</b>
-                            <span>`.so` fingerprint verification</span>
-                            <input
-                              accept=".so,application/octet-stream"
-                              onChange={(event) =>
-                                void uploadArtifacts(
-                                  "binary",
-                                  event.target.files,
-                                )
-                              }
-                              type="file"
-                            />
-                          </label>
-                        </div>
-                      </section>
+                          <button className="primary-button" type="submit">
+                            <Github size={15} />
+                            Connect repository
+                          </button>
+                        </form>
+                      </details>
                     </section>
 
                     {sourceError === null ? null : (

@@ -3,8 +3,30 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { DASHBOARD_BASE_PATH, dashboardPath } from "@/lib/paths";
 
+function canonicalUrl(pathname: string, request: NextRequest): URL {
+  const configuredOrigin = process.env.NEXT_PUBLIC_MARKETING_URL;
+  return new URL(pathname, configuredOrigin ?? request.nextUrl.origin);
+}
+
+function redirectWithCookies(url: URL, response: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+  return redirect;
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname.startsWith(DASHBOARD_BASE_PATH)
+    ? request.nextUrl.pathname.slice(DASHBOARD_BASE_PATH.length) || "/"
+    : request.nextUrl.pathname;
+
+  if (pathname === "/login" || pathname === "/signup") {
+    return NextResponse.redirect(canonicalUrl(pathname, request), 308);
+  }
+  if (pathname === "/overview") {
+    return NextResponse.redirect(canonicalUrl("/dashboard", request), 308);
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !publishableKey) return response;
@@ -25,17 +47,13 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname.startsWith(DASHBOARD_BASE_PATH)
-    ? request.nextUrl.pathname.slice(DASHBOARD_BASE_PATH.length) || "/"
-    : request.nextUrl.pathname;
-  const isAuthRoute = ["/login", "/signup"].includes(pathname);
-  if (user === null && !isAuthRoute) {
-    return NextResponse.redirect(new URL(dashboardPath("/login"), request.url));
-  }
-  if (user !== null && isAuthRoute) {
-    return NextResponse.redirect(
-      new URL(dashboardPath("/overview"), request.url),
+  if (user === null) {
+    const loginUrl = canonicalUrl("/login", request);
+    loginUrl.searchParams.set(
+      "redirect",
+      pathname === "/" ? "/dashboard" : dashboardPath(pathname),
     );
+    return redirectWithCookies(loginUrl, response);
   }
   return response;
 }

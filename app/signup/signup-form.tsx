@@ -38,7 +38,7 @@ export function SignupForm() {
       );
       if (result.error !== null) { setError(result.error.message); setPending(false); return; }
       if (result.data.session === null) { setNotice(`Check ${email} to confirm your account, then sign in.`); setPending(false); return; }
-      router.replace("/overview"); router.refresh();
+      router.replace("/"); router.refresh();
     } catch (cause) {
       setError(authFailureMessage(cause));
       setPending(false);

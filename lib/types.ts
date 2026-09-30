@@ -86,6 +86,19 @@ export interface DashboardSourceWorkspace {
   readonly status: "connected" | "error" | "needs_installation";
 }
 
+export interface DashboardGitHubConnection {
+  readonly githubIdentityConnected: boolean;
+  readonly installationConnected: boolean;
+  readonly repositories: readonly {
+    readonly defaultBranch: string;
+    readonly name: string;
+    readonly owner: string;
+    readonly private: boolean;
+    readonly updatedAt: string;
+    readonly url: string;
+  }[];
+}
+
 export interface DashboardProgram {
   readonly currentSnapshot: Readonly<Record<string, unknown>> | null;
   readonly displayName: string;

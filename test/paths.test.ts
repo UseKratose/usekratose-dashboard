@@ -11,4 +11,10 @@ describe("dashboard paths", () => {
   it("normalizes relative paths", () => {
     expect(dashboardPath("programs?add=1")).toBe("/dashboard/programs?add=1");
   });
+
+  it("builds the GitHub installation completion return path", () => {
+    expect(dashboardPath("/programs?github=installed")).toBe(
+      "/dashboard/programs?github=installed",
+    );
+  });
 });

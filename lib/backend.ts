@@ -13,6 +13,11 @@ export function backendUrl(path: string): string {
   return new URL(path, base).toString();
 }
 
+export function marketingUrl(path: string): string {
+  const origin = process.env.NEXT_PUBLIC_MARKETING_URL ?? "http://localhost:3000";
+  return new URL(path, origin).toString();
+}
+
 export const requireDashboardSession = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const [userResult, sessionResult] = await Promise.all([
@@ -21,7 +26,7 @@ export const requireDashboardSession = cache(async () => {
   ]);
   const user = userResult.data.user;
   const accessToken = sessionResult.data.session?.access_token;
-  if (user === null || accessToken === undefined) redirect("/login");
+  if (user === null || accessToken === undefined) redirect(marketingUrl("/login"));
   return { accessToken, user };
 });
 
@@ -31,7 +36,7 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
     cache: "no-store",
     headers: { authorization: `Bearer ${accessToken}` },
   });
-  if (response.status === 401) redirect("/login");
+  if (response.status === 401) redirect(marketingUrl("/login"));
   if (!response.ok)
     throw new Error(`Dashboard API failed (${response.status})`);
   const body = (await response.json()) as { readonly data: DashboardApiData };

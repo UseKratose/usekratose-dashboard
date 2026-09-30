@@ -36,6 +36,6 @@ export function authFailureMessage(error: unknown): string {
 
 export function signupConfirmationUrl(origin: string): string {
   const callback = new URL("/auth/callback", origin);
-  callback.searchParams.set("redirect", "/dashboard/overview");
+  callback.searchParams.set("redirect", "/dashboard");
   return callback.toString();
 }

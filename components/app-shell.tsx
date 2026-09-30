@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -31,7 +31,7 @@ import type { DashboardProfile } from "@/lib/types";
 import { BrandLogo } from "./brand-logo";
 
 const navigation = [
-  { href: "/overview", icon: LayoutDashboard, label: "Overview" },
+  { href: "/", icon: LayoutDashboard, label: "Overview" },
   { href: "/programs", icon: ShieldCheck, label: "Programs" },
   { href: "/events", icon: FileClock, label: "Security events" },
   { href: "/alerts", icon: Bell, label: "Alerts" },
@@ -63,7 +63,6 @@ export function AppShell({
   readonly workspace: { readonly id: string; readonly name: string };
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -92,8 +91,7 @@ export function AppShell({
 
   async function signOut() {
     await getSupabaseBrowserClient().auth.signOut();
-    router.replace("/login");
-    router.refresh();
+    window.location.assign("/login");
   }
 
   const renderNavigation = (
@@ -129,7 +127,7 @@ export function AppShell({
       ) : null}
       <aside className={`console-sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand-row">
-          <Link className="brand" href="/overview">
+          <Link className="brand" href="/">
             <BrandLogo />
             <span>UseKratose</span>
           </Link>

@@ -32,7 +32,7 @@ export function LoginForm() {
         setPending(false);
         return;
       }
-      router.replace("/overview");
+      router.replace("/");
       router.refresh();
     } catch (cause) {
       setError(authFailureMessage(cause));
