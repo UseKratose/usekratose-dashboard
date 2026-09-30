@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Activity, BellRing, Eye, ShieldCheck } from "lucide-react";
 
 import { AddProgramButton } from "@/components/add-program-button";
+import { OverviewActivityChartLoader } from "@/components/overview-activity-chart-loader";
 import { PageHeader } from "@/components/page-header";
 import { ProgramInspector } from "@/components/program-inspector";
 import { StatusBadge } from "@/components/status-badge";
@@ -62,6 +63,7 @@ export default async function OverviewPage() {
           <small>Evidence consumers</small>
         </article>
       </section>
+      <OverviewActivityChartLoader programs={data.programs} />
       <section className="dashboard-grid">
         <article className="surface span-two program-management-surface">
           <div className="surface-header">
