@@ -368,7 +368,7 @@ export function ProgramInspector({
     setAnalysisError(null);
     try {
       const response = await fetch(
-        `/api/programs/${entry.program.id}/analysis`,
+        dashboardPath(`/api/programs/${entry.program.id}/analysis`),
         { method: "POST" },
       );
       const body = (await response.json().catch(() => null)) as {
@@ -590,7 +590,9 @@ export function ProgramInspector({
   async function decideFix(findingId: string, decision: "apply" | "reject") {
     if (analysis === null) return;
     const response = await fetch(
-      `/api/programs/${entry.program.id}/analysis/${analysis.analysisId}/findings/${findingId}`,
+      dashboardPath(
+        `/api/programs/${entry.program.id}/analysis/${analysis.analysisId}/findings/${findingId}`,
+      ),
       {
         body: JSON.stringify({ decision }),
         headers: { "content-type": "application/json" },
