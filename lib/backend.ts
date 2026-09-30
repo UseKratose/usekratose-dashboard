@@ -6,6 +6,7 @@ import type { DashboardApiData, DashboardData } from "./types";
 
 export function backendUrl(path: string): string {
   const base =
+    process.env.NEXT_PUBLIC_MARKETING_URL ??
     process.env.USEKRATOSE_API_URL ??
     process.env.NEXT_PUBLIC_USEKRATOSE_API_URL ??
     "http://localhost:3000";
